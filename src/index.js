@@ -119,12 +119,19 @@ async function getSizeInfo(code, filename, raw) {
 		'gz',
 		raw || code.length < 5000,
 	);
-	const brotli = formatSize(
-		await brotliSize(code),
-		filename,
-		'br',
-		raw || code.length < 5000,
-	);
+	let brotli;
+	//wrap brotliSize in try/catch in case brotli is unavailable due to
+	//lower node version
+	try {
+		brotli = formatSize(
+			await brotliSize(code),
+			filename,
+			'br',
+			raw || code.length < 5000,
+		);
+	} catch (e) {
+		return gzip;
+	}
 	return gzip + '\n' + brotli;
 }
 
@@ -591,6 +598,11 @@ function createConfig(options, entry, format, writeMeta) {
 								},
 								minifyOptions.compress || {},
 							),
+							output: {
+								// By default, Terser wraps function arguments in extra parens to trigger eager parsing.
+								// Whether this is a good idea is way too specific to guess, so we optimize for size by default:
+								wrap_func_args: false,
+							},
 							warnings: true,
 							ecma: modern ? 9 : 5,
 							toplevel: modern || format === 'cjs' || format === 'es',
